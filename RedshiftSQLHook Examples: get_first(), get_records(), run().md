@@ -239,8 +239,3 @@ Demonstrates all three methods using a consistent 5×3 dataset example.
 
 ---
 
-If you'd like, I can also add:
-
-✅ Pandas conversion examples
-✅ Writing results to S3
-✅ Using these hooks with Redshift **Serverless**
