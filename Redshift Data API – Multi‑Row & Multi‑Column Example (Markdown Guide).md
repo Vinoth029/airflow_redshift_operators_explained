@@ -243,7 +243,8 @@ def fetch_redshift_data(**context):
     """
 
     # Step 1 — Execute query
-    resp = hook.execute_statement(sql=sql, with_event=False)
+    
+    resp = hook.execute_statement(sql=sql, with_event=False)  # resp <- {"Id": "d3b21483-a2ed-4550-b508-998e9c9c3381"}
 
     # Step 2 — Retrieve results
     result = hook.get_statement_result(resp["Id"])
