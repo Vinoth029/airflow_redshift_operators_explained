@@ -205,3 +205,113 @@ If you want, I can also add:
 * A helper function to convert ANY Data API response into a DataFrame automatically
 * A DAG example that uses this parsing logic inside Airflow
 * A comparison between RedshiftSQLHook and RedshiftDataHook
+
+---
+
+# 🏗 **9. Full Airflow DAG Using Redshift Data API (Multi‑Row, Multi‑Column Example)**
+
+Below is a production‑style Airflow DAG that:
+
+* Runs a multi‑column query using **RedshiftDataHook** (Data API)
+* Retrieves all rows + columns
+* Extracts values programmatically
+* Converts them to a clean Pandas DataFrame
+* Prints / returns useful output
+
+```python
+from datetime import datetime, timedelta
+import pandas as pd
+from airflow import DAG
+from airflow.operators.python import PythonOperator
+from airflow.providers.amazon.aws.hooks.redshift_data import RedshiftDataHook
+
+# -------------------------------------------------------
+# Function: Query Redshift (Data API) and return Records
+# -------------------------------------------------------
+def fetch_redshift_data(**context):
+    hook = RedshiftDataHook(
+        cluster_identifier="{{ var.value.redshift_cluster_identifier }}",
+        database="dev",
+        db_user="awsuser",
+        aws_conn_id="aws_default"
+    )
+
+    sql = """
+        SELECT order_id, customer_id, amount
+        FROM mart.orders_summary
+        LIMIT 5;
+    """
+
+    # Step 1 — Execute query
+    resp = hook.execute_statement(sql=sql, with_event=False)
+
+    # Step 2 — Retrieve results
+    result = hook.get_statement_result(resp["Id"])
+    records = result["Records"]
+
+    # Step 3 — Parse into clean python list
+    clean_rows = []
+    for row in records:
+        clean_rows.append({
+            "order_id": row[0].get("longValue"),
+            "customer_id": row[1].get("longValue"),
+            "amount": row[2].get("doubleValue")
+        })
+
+    # Step 4 — Push as JSON for downstream tasks
+    ti = context["ti"]
+    ti.xcom_push(key="orders_clean", value=pd.DataFrame(clean_rows).to_json(orient="records"))
+
+    print("Fetched & Parsed Records:")
+    print(clean_rows)
+
+
+# -------------------------------------------------------
+# Function: Convert JSON → DataFrame and print
+# -------------------------------------------------------
+def convert_to_dataframe(**context):
+    ti = context["ti"]
+
+    df_json = ti.xcom_pull(task_ids="fetch_data", key="orders_clean")
+    df = pd.read_json(df_json)
+
+    print("DataFrame from XCom:")
+    print(df)
+
+    return "Converted to DataFrame"
+
+
+# -------------------------------------------------------
+# DAG Definition
+# -------------------------------------------------------
+default_args = {
+    "owner": "data-eng",
+    "retries": 2,
+    "retry_delay": timedelta(minutes=3),
+}
+
+with DAG(
+    dag_id="redshift_data_api_multicolumn_dag",
+    start_date=datetime(2025, 1, 1),
+    schedule_interval=None,
+    catchup=False,
+    default_args=default_args,
+    tags=["redshift", "data-api", "multicolumn"]
+) as dag:
+
+    fetch_data = PythonOperator(
+        task_id="fetch_data",
+        python_callable=fetch_redshift_data,
+        provide_context=True,
+    )
+
+    convert_df = PythonOperator(
+        task_id="convert_df",
+        python_callable=convert_to_dataframe,
+        provide_context=True,
+    )
+
+    fetch_data >> convert_df
+```
+
+---
