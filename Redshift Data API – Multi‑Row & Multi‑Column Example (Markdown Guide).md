@@ -200,14 +200,6 @@ This structured approach is needed because the Data API is schema-aware and type
 
 ---
 
-If you want, I can also add:
-
-* A helper function to convert ANY Data API response into a DataFrame automatically
-* A DAG example that uses this parsing logic inside Airflow
-* A comparison between RedshiftSQLHook and RedshiftDataHook
-
----
-
 # 🏗 **9. Full Airflow DAG Using Redshift Data API (Multi‑Row, Multi‑Column Example)**
 
 Below is a production‑style Airflow DAG that:
